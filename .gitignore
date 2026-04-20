@@ -1,0 +1,52 @@
+# ═══════════════════════════════════
+#   YOLO Detection Pipeline
+#   .gitignore
+# ═══════════════════════════════════
+
+# ── الصور الفعلية (لا نرفعها) ──
+images/*
+!images/.gitkeep
+!images/add_images_here.txt
+
+# ── مجلد الإخراج ──
+output/
+
+# ── نماذج YOLO ──
+*.pt
+*.onnx
+*.engine
+*.torchscript
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ── البيئة الافتراضية ──
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Jupyter ──
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Logs ──
+*.log
+logs/
+runs/

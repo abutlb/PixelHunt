@@ -196,7 +196,9 @@ Models are **auto-downloaded** by Ultralytics on first run.
 
 ## 📜 License
 
-MIT License — free to use, modify, and distribute.
+MIT License — free to use, modify, and distribute for **personal and non-commercial use**.
+
+For commercial licensing, contact: abutlb10015@gmail.com
 
 ---
 

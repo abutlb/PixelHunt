@@ -36,6 +36,9 @@ from rich import box
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+# ✅ استيراد المترجم
+from translations import ClassTranslator
+
 # ════════════════════════════════════════════════
 #   GLOBALS
 # ════════════════════════════════════════════════
@@ -44,7 +47,7 @@ console = Console()
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"}
 
-REPORT_RTL = True   # يتغير عبر --dir
+REPORT_RTL = True
 
 BANNER = r"""
 ╔═══════════════════════════════════════════════════════════════════════════════╗
@@ -61,7 +64,6 @@ BANNER = r"""
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 """
 
-# ألوان الكلاسات (BGR لـ OpenCV)
 CLASS_COLORS = [
     (255,  56,  56), (255, 157, 151), (255, 112,  31),
     (255, 178,  29), (207, 210,  49), ( 72, 249,  10),
@@ -81,29 +83,23 @@ def get_color(class_id: int) -> tuple:
 # ════════════════════════════════════════════════
 
 def _apply_sheet_style(ws, is_rtl: bool = True):
-    """تطبيق RTL + تنسيق احترافي على شيت Excel"""
-
     ws.sheet_view.rightToLeft = is_rtl
+    header_fill = PatternFill("solid", fgColor="1F3864")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    alt_fill    = PatternFill("solid", fgColor="EEF2FF")
+    h_align     = "right" if is_rtl else "left"
 
-    header_fill  = PatternFill("solid", fgColor="1F3864")
-    header_font  = Font(bold=True, color="FFFFFF", size=11)
-    alt_fill     = PatternFill("solid", fgColor="EEF2FF")
-    h_align      = "right" if is_rtl else "left"
-
-    # ── هيدر ──
     for cell in ws[1]:
         cell.fill      = header_fill
         cell.font      = header_font
         cell.alignment = Alignment(horizontal=h_align, vertical="center", wrap_text=True)
 
-    # ── صفوف البيانات ──
     for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
         fill = alt_fill if i % 2 == 0 else PatternFill()
         for cell in row:
             cell.fill      = fill
             cell.alignment = Alignment(horizontal=h_align, vertical="center")
 
-    # ── عرض الأعمدة تلقائي ──
     for col in ws.columns:
         max_len = max(
             (len(str(cell.value)) if cell.value is not None else 0 for cell in col),
@@ -111,7 +107,6 @@ def _apply_sheet_style(ws, is_rtl: bool = True):
         )
         ws.column_dimensions[get_column_letter(col[0].column)].width = min(max_len + 4, 45)
 
-    # ── تجميد الهيدر ──
     ws.freeze_panes = "A2"
 
 
@@ -139,7 +134,12 @@ def load_images(folder: Path) -> list[Path]:
 #   CORE DETECTION
 # ════════════════════════════════════════════════
 
-def run_detection(model: YOLO, images: list[Path], conf: float) -> list[dict]:
+def run_detection(
+    model      : YOLO,
+    images     : list[Path],
+    conf       : float,
+    translator : ClassTranslator,          # ✅ مضاف
+) -> list[dict]:
     all_results = []
 
     with Progress(
@@ -163,6 +163,8 @@ def run_detection(model: YOLO, images: list[Path], conf: float) -> list[dict]:
             for b in results.boxes:
                 cls_id     = int(b.cls[0])
                 cls_name   = model.names[cls_id]
+                # ✅ الاسم المعروض: "سيارة (car)" أو "car"
+                cls_display = translator.translate_display(cls_name)
                 confidence = float(b.conf[0])
                 x1, y1, x2, y2 = map(int, b.xyxy[0])
 
@@ -170,12 +172,11 @@ def run_detection(model: YOLO, images: list[Path], conf: float) -> list[dict]:
                     "image_name"  : img_path.name,
                     "image_path"  : str(img_path.resolve()),
                     "class_id"    : cls_id,
-                    "class_name"  : cls_name,
+                    "class_name"  : cls_display,        # ✅ ثنائي اللغة
+                    "class_en"    : cls_name,            # ✅ الإنجليزي للمعالجة الداخلية
                     "confidence"  : round(confidence, 4),
-                    "x1"          : x1,
-                    "y1"          : y1,
-                    "x2"          : x2,
-                    "y2"          : y2,
+                    "x1"          : x1, "y1": y1,
+                    "x2"          : x2, "y2": y2,
                     "obj_width"   : x2 - x1,
                     "obj_height"  : y2 - y1,
                     "img_width"   : w,
@@ -189,9 +190,10 @@ def run_detection(model: YOLO, images: list[Path], conf: float) -> list[dict]:
                     "image_path"  : str(img_path.resolve()),
                     "class_id"    : None,
                     "class_name"  : "no_detection",
+                    "class_en"    : "no_detection",
                     "confidence"  : 0.0,
-                    "x1"          : None, "y1": None,
-                    "x2"          : None, "y2": None,
+                    "x1": None, "y1": None,
+                    "x2": None, "y2": None,
                     "obj_width"   : None, "obj_height": None,
                     "img_width"   : w,
                     "img_height"  : h,
@@ -256,15 +258,10 @@ def _save_excel(df: pd.DataFrame, path: Path, is_rtl: bool):
         # ── Sheet 4: Stats Overview ──
         stats = {
             "Metric": [
-                "Total Images Scanned",
-                "Images With Detections",
-                "Images Without Detections",
-                "Total Objects Detected",
-                "Unique Classes Found",
-                "Average Confidence",
-                "Highest Confidence",
-                "Lowest Confidence",
-                "Generated At",
+                "Total Images Scanned", "Images With Detections",
+                "Images Without Detections", "Total Objects Detected",
+                "Unique Classes Found", "Average Confidence",
+                "Highest Confidence", "Lowest Confidence", "Generated At",
             ],
             "Value": [
                 df["image_name"].nunique(),
@@ -280,19 +277,17 @@ def _save_excel(df: pd.DataFrame, path: Path, is_rtl: bool):
         }
         pd.DataFrame(stats).to_excel(writer, sheet_name="Stats Overview", index=False)
 
-        # ── تطبيق الستايل على كل الشيتات ──
         for sheet_name in writer.sheets:
             _apply_sheet_style(writer.sheets[sheet_name], is_rtl=is_rtl)
 
 
 def _print_report_tables(df: pd.DataFrame):
-    detected     = df[df["class_name"] != "no_detection"]
-    total_imgs   = df["image_name"].nunique()
-    total_objs   = len(detected)
-    total_cls    = detected["class_name"].nunique() if not detected.empty else 0
-    avg_conf     = detected["confidence"].mean()    if not detected.empty else 0.0
+    detected   = df[df["class_name"] != "no_detection"]
+    total_imgs = df["image_name"].nunique()
+    total_objs = len(detected)
+    total_cls  = detected["class_name"].nunique() if not detected.empty else 0
+    avg_conf   = detected["confidence"].mean()    if not detected.empty else 0.0
 
-    # ── بانر الملخص ──
     console.print()
     console.print(Panel(
         Align.center(Text.assemble(
@@ -318,21 +313,18 @@ def _print_report_tables(df: pd.DataFrame):
     tbl1 = Table(
         title="🏷️  Detected Classes",
         caption=f"Total: {total_objs} objects  •  {total_cls} classes",
-        box=box.DOUBLE_EDGE,
-        border_style="bright_blue",
+        box=box.DOUBLE_EDGE, border_style="bright_blue",
         header_style="bold bright_white on navy_blue",
-        show_lines=True,
-        padding=(0, 1),
-        title_style="bold cyan",
-        caption_style="dim cyan",
+        show_lines=True, padding=(0, 1),
+        title_style="bold cyan", caption_style="dim cyan",
     )
-    tbl1.add_column("Rank",         style="bold white",       justify="center")
-    tbl1.add_column("Class",        style="bold yellow",      justify="left")
-    tbl1.add_column("Objects",      style="bold white",       justify="center")
-    tbl1.add_column("Images",       style="cyan",             justify="center")
-    tbl1.add_column("Avg Conf",     style="green",            justify="center")
-    tbl1.add_column("Max Conf",     style="bright_green",     justify="center")
-    tbl1.add_column("Distribution", style="cyan",             justify="left")
+    tbl1.add_column("Rank",         style="bold white",   justify="center")
+    tbl1.add_column("Class",        style="bold yellow",  justify="left")
+    tbl1.add_column("Objects",      style="bold white",   justify="center")
+    tbl1.add_column("Images",       style="cyan",         justify="center")
+    tbl1.add_column("Avg Conf",     style="green",        justify="center")
+    tbl1.add_column("Max Conf",     style="bright_green", justify="center")
+    tbl1.add_column("Distribution", style="cyan",         justify="left")
 
     class_summary = (
         detected.groupby("class_name")
@@ -350,13 +342,9 @@ def _print_report_tables(df: pd.DataFrame):
         bar_len = int((row["count"] / class_summary["count"].max()) * 14)
         bar     = f"[cyan]{'█' * bar_len}[/cyan][dim]{'░' * (14 - bar_len)}[/dim]"
         tbl1.add_row(
-            medal,
-            str(cls),
-            str(int(row["count"])),
-            str(int(row["imgs"])),
-            f"{row['avg_conf']:.1%}",
-            f"{row['max_conf']:.1%}",
-            bar,
+            medal, str(cls),
+            str(int(row["count"])), str(int(row["imgs"])),
+            f"{row['avg_conf']:.1%}", f"{row['max_conf']:.1%}", bar,
         )
 
     console.print(Align.center(tbl1))
@@ -369,19 +357,16 @@ def _print_report_tables(df: pd.DataFrame):
     tbl2 = Table(
         title="📸  Image Results",
         caption=f"Scanned {total_imgs} images",
-        box=box.DOUBLE_EDGE,
-        border_style="bright_blue",
+        box=box.DOUBLE_EDGE, border_style="bright_blue",
         header_style="bold bright_white on navy_blue",
-        show_lines=True,
-        padding=(0, 1),
-        title_style="bold yellow",
-        caption_style="dim cyan",
+        show_lines=True, padding=(0, 1),
+        title_style="bold yellow", caption_style="dim cyan",
     )
-    tbl2.add_column("Image Name",  style="bold white",  justify="left",   no_wrap=True)
-    tbl2.add_column("Objects",     style="bold yellow", justify="center")
-    tbl2.add_column("Classes",     style="cyan",        justify="center")
-    tbl2.add_column("Found",       style="dim white",   justify="left")
-    tbl2.add_column("Avg Conf",    style="green",       justify="center")
+    tbl2.add_column("Image Name", style="bold white",  justify="left",   no_wrap=True)
+    tbl2.add_column("Objects",    style="bold yellow", justify="center")
+    tbl2.add_column("Classes",    style="cyan",        justify="center")
+    tbl2.add_column("Found",      style="dim white",   justify="left")
+    tbl2.add_column("Avg Conf",   style="green",       justify="center")
 
     img_summary = (
         detected.groupby("image_name")
@@ -399,16 +384,19 @@ def _print_report_tables(df: pd.DataFrame):
         found  = row["found"][:45] + ("…" if len(row["found"]) > 45 else "")
         tbl2.add_row(
             f"{status}  {img}",
-            str(int(row["objs"])),
-            str(int(row["classes"])),
-            found,
-            f"{row['conf']:.1%}",
+            str(int(row["objs"])), str(int(row["classes"])),
+            found, f"{row['conf']:.1%}",
         )
 
     console.print(Align.center(tbl2))
 
 
-def mode_report(data: list[dict], output_dir: Path, fmt: str, is_rtl: bool):
+def mode_report(
+    data       : list[dict],
+    output_dir : Path,
+    fmt        : str,
+    is_rtl     : bool,
+):
     report_dir = output_dir / "reports"
     report_dir.mkdir(parents=True, exist_ok=True)
     ts  = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -439,7 +427,13 @@ def mode_report(data: list[dict], output_dir: Path, fmt: str, is_rtl: bool):
 #   MODE 2 — ANNOTATE
 # ════════════════════════════════════════════════
 
-def mode_annotate(model: YOLO, images: list[Path], output_dir: Path, conf: float):
+def mode_annotate(
+    model      : YOLO,
+    images     : list[Path],
+    output_dir : Path,
+    conf       : float,
+    translator : ClassTranslator,          # ✅ مضاف
+):
     ann_dir = output_dir / "annotated"
     ann_dir.mkdir(parents=True, exist_ok=True)
     saved = 0
@@ -465,12 +459,12 @@ def mode_annotate(model: YOLO, images: list[Path], output_dir: Path, conf: float
                 x1, y1, x2, y2 = map(int, b.xyxy[0])
                 color = get_color(cls_id)
 
-                # مستطيل مزدوج
+                # ✅ الليبل ثنائي اللغة: "سيارة (car)"
+                label = f"  {translator.translate_display(cls_name)}  {conf_val:.0%}  "
+
                 cv2.rectangle(img, (x1, y1), (x2, y2), color, 3)
                 cv2.rectangle(img, (x1+1, y1+1), (x2-1, y2-1), (255, 255, 255), 1)
 
-                # خلفية النص
-                label = f"  {cls_name}  {conf_val:.0%}  "
                 (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
                 cv2.rectangle(img, (x1, y1 - th - 14), (x1 + tw + 4, y1), color, -1)
                 cv2.putText(img, label, (x1 + 2, y1 - 6),
@@ -498,12 +492,38 @@ def mode_filter(
     model          : YOLO,
     images         : list[Path],
     output_dir     : Path,
-    target_classes : list[str],
+    raw_tokens     : list[str],            # ✅ tokens خام من CLI
     conf           : float,
     is_rtl         : bool,
+    translator     : ClassTranslator,      # ✅ مضاف
 ):
-    target_lower = {c.lower() for c in target_classes}
-    folder_name  = "filtered__" + "_".join(target_classes)
+    # ── ① حل مشكلة الكلمتين + Validation ──
+    valid_en, invalid = translator.match_classes(raw_tokens)
+
+    # ⚠️ تحذير للكلاسات الخاطئة
+    if invalid:
+        console.print(Panel(
+            f"[bold yellow]⚠️  الكلاسات التالية غير موجودة:[/bold yellow]  "
+            f"[red]{', '.join(invalid)}[/red]\n\n"
+            f"[dim]الكلاسات المتاحة:\n{translator.available_classes_display()}[/dim]",
+            border_style="yellow",
+            padding=(1, 3),
+        ))
+
+    # ❌ لو كل الكلاسات خاطئة
+    if not valid_en:
+        console.print("[bold red]❌  لا توجد كلاسات صحيحة للمتابعة![/bold red]")
+        sys.exit(1)
+
+    # ✅ عرض ما سيتم البحث عنه
+    display_names = [translator.translate_display(c) for c in valid_en]
+    console.print(
+        f"[bold green]✅  سيتم البحث عن:[/bold green]  "
+        f"[cyan]{', '.join(display_names)}[/cyan]\n"
+    )
+
+    target_lower = {c.lower() for c in valid_en}
+    folder_name  = "filtered__" + "_".join(valid_en)
     filtered_dir = output_dir / folder_name
     filtered_dir.mkdir(parents=True, exist_ok=True)
 
@@ -538,10 +558,12 @@ def mode_filter(
                     x1, y1, x2, y2 = map(int, b.xyxy[0])
                     color = get_color(cls_id)
 
+                    # ✅ الليبل ثنائي اللغة
+                    label = f"  ★ {translator.translate_display(cls_name)}  {conf_val:.0%}  "
+
                     cv2.rectangle(img, (x1, y1), (x2, y2), color, 3)
                     cv2.rectangle(img, (x1+1, y1+1), (x2-1, y2-1), (255, 255, 255), 1)
 
-                    label = f"  ★ {cls_name}  {conf_val:.0%}  "
                     (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)
                     cv2.rectangle(img, (x1, y1 - th - 14), (x1 + tw + 4, y1), color, -1)
                     cv2.putText(img, label, (x1 + 2, y1 - 6),
@@ -549,10 +571,10 @@ def mode_filter(
 
                     match_data.append({
                         "image_name"  : img_path.name,
-                        "class_name"  : cls_name,
+                        "class_name"  : translator.translate_display(cls_name),  # ✅
+                        "class_en"    : cls_name,
                         "confidence"  : round(conf_val, 4),
-                        "x1"          : x1, "y1": y1,
-                        "x2"          : x2, "y2": y2,
+                        "x1": x1, "y1": y1, "x2": x2, "y2": y2,
                         "obj_width"   : x2 - x1,
                         "obj_height"  : y2 - y1,
                         "detected_at" : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -568,9 +590,8 @@ def mode_filter(
     if not matched_imgs:
         console.print(Panel(
             f"[bold red]⚠️  No images found containing:[/bold red]\n"
-            f"[yellow]  {', '.join(target_classes)}[/yellow]",
-            border_style="red",
-            padding=(1, 4),
+            f"[yellow]  {', '.join(display_names)}[/yellow]",
+            border_style="red", padding=(1, 4),
         ))
         return
 
@@ -578,21 +599,18 @@ def mode_filter(
     console.print()
 
     tbl = Table(
-        title=f"🎯  Matched — {', '.join(target_classes)}",
+        title=f"🎯  Matched — {', '.join(display_names)}",
         caption=f"{len(matched_imgs)} matching images  •  {len(match_data)} total detections",
-        box=box.DOUBLE_EDGE,
-        border_style="bright_blue",
+        box=box.DOUBLE_EDGE, border_style="bright_blue",
         header_style="bold bright_white on navy_blue",
-        show_lines=True,
-        padding=(0, 1),
-        title_style="bold magenta",
-        caption_style="dim cyan",
+        show_lines=True, padding=(0, 1),
+        title_style="bold magenta", caption_style="dim cyan",
     )
-    tbl.add_column("Image",       style="bold white",  justify="left", no_wrap=True)
-    tbl.add_column("Class",       style="bold yellow", justify="center")
-    tbl.add_column("Confidence",  style="bold green",  justify="center")
-    tbl.add_column("Position",    style="cyan",        justify="center")
-    tbl.add_column("Size (px)",   style="dim white",   justify="center")
+    tbl.add_column("Image",      style="bold white",  justify="left",   no_wrap=True)
+    tbl.add_column("Class",      style="bold yellow", justify="center")
+    tbl.add_column("Confidence", style="bold green",  justify="center")
+    tbl.add_column("Position",   style="cyan",        justify="center")
+    tbl.add_column("Size (px)",  style="dim white",   justify="center")
 
     for d in match_data:
         tbl.add_row(
@@ -605,12 +623,11 @@ def mode_filter(
 
     console.print(Align.center(tbl))
 
-    # حفظ CSV
     if match_data:
         report_dir = output_dir / "reports"
         report_dir.mkdir(exist_ok=True)
-        ts  = datetime.now().strftime("%Y%m%d_%H%M%S")
-        csv_path = report_dir / f"pixelhunt_filter_{'_'.join(target_classes)}_{ts}.csv"
+        ts       = datetime.now().strftime("%Y%m%d_%H%M%S")
+        csv_path = report_dir / f"pixelhunt_filter_{'_'.join(valid_en)}_{ts}.csv"
         pd.DataFrame(match_data).to_csv(csv_path, index=False, encoding="utf-8-sig")
 
         console.print()
@@ -619,8 +636,7 @@ def mode_filter(
             f"[dim cyan]📁  Folder  →  {filtered_dir.resolve()}[/dim cyan]\n"
             f"[dim cyan]📄  CSV     →  {csv_path}[/dim cyan]",
             title="[bold white]🎯  Mode 3 — Complete[/bold white]",
-            border_style="magenta",
-            padding=(1, 4),
+            border_style="magenta", padding=(1, 4),
         ))
 
 
@@ -643,20 +659,31 @@ def main():
     parser.add_argument("--mode",         type=int, choices=[1, 2, 3], required=True,
                         help="1 = Report\n2 = Annotate\n3 = Filter by class")
     parser.add_argument("--classes", "-c", nargs="+",
-                        help="Target classes for mode 3\n  e.g. --classes car plane person")
+                        help=(
+                            "Target classes for mode 3\n"
+                            "  English : --classes car person\n"
+                            "  Arabic  : --classes سيارة شخص\n"
+                            "  Multi-word: --classes لوحة مفاتيح سيارة"
+                        ))
     parser.add_argument("--format",  "-f", choices=["csv", "excel", "both"], default="both",
                         help="Report format for mode 1  (default: both)")
     parser.add_argument("--conf",         type=float, default=0.25,
                         help="Confidence threshold      (default: 0.25)")
     parser.add_argument("--dir",          choices=["LTR", "RTL"], default="RTL",
                         help="Report/Excel direction    (default: RTL)")
+    # ✅ وسيط اللغة
+    parser.add_argument("--lang",         default="en",
+                        choices=ClassTranslator.available_languages(),
+                        help="Output language  (default: en)\n  e.g. --lang ar")
 
     args   = parser.parse_args()
     is_rtl = (args.dir == "RTL")
 
+    # ✅ تهيئة المترجم مرة واحدة وتمريره لكل الدوال
+    translator = ClassTranslator(lang=args.lang)
+
     mode_label = {1: "Report", 2: "Annotate", 3: "Filter"}[args.mode]
 
-    # ── شاشة الترحيب ──
     console.print()
     console.print(Panel(
         Align.center(Text.assemble(
@@ -665,7 +692,8 @@ def main():
             (f"{mode_label:^10}", "bold yellow"),
             (f"  |  Model  ", "dim white"),
             (f"{args.model:^16}", "bold green"),
-            (f"  |  Dir  ", "dim white"),
+            (f"  |  Lang  ", "dim white"),
+            (f"{args.lang.upper()}  |  Dir  ", "bold magenta"),
             (f"{args.dir}\n", "bold magenta"),
         )),
         border_style="bright_blue",
@@ -677,33 +705,33 @@ def main():
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # تحميل النموذج
     console.print(f"[bold cyan]📦  Loading model:[/bold cyan]  [yellow]{args.model}[/yellow]")
     model = YOLO(args.model)
 
-    # تحميل الصور
     images = load_images(images_dir)
     console.print(f"[bold cyan]🖼️   Images found:[/bold cyan]   [yellow]{len(images)}[/yellow]\n")
 
-    # ── تشغيل الوضع ──
     if args.mode == 1:
         console.rule("[bold cyan]Mode 1 — Detection Report[/bold cyan]")
-        data = run_detection(model, images, args.conf)
+        # ✅ تمرير المترجم
+        data = run_detection(model, images, args.conf, translator)
         mode_report(data, output_dir, args.format, is_rtl=is_rtl)
 
     elif args.mode == 2:
         console.rule("[bold yellow]Mode 2 — Annotate Images[/bold yellow]")
-        mode_annotate(model, images, output_dir, args.conf)
+        # ✅ تمرير المترجم
+        mode_annotate(model, images, output_dir, args.conf, translator)
 
     elif args.mode == 3:
         if not args.classes:
             console.print(
                 "[bold red]❌  Mode 3 requires --classes\n"
-                "    e.g.  python pixelhunt.py --mode 3 --classes car plane[/bold red]"
+                "    e.g.  python pixelhunt.py --mode 3 --lang ar --classes سيارة شخص[/bold red]"
             )
             sys.exit(1)
         console.rule("[bold magenta]Mode 3 — Filter by Class[/bold magenta]")
-        mode_filter(model, images, output_dir, args.classes, args.conf, is_rtl)
+        # ✅ تمرير raw_tokens والمترجم
+        mode_filter(model, images, output_dir, args.classes, args.conf, is_rtl, translator)
 
     console.print()
     console.rule("[bold green]✅  PixelHunt — Done[/bold green]")

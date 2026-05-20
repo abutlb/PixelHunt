@@ -3,4 +3,5 @@ opencv-python
 pandas
 openpyxl
 rich
-Pillow
+requests
+gradio>=4.0

@@ -232,7 +232,7 @@ def run_detection(
 #   Gradio UI
 # ════════════════════════════════════════════════
 
-with gr.Blocks(title="🎯 PixelHunt", css=CUSTOM_CSS) as demo:
+with gr.Blocks(title="🎯 PixelHunt") as demo:
 
     # ── البانر ──
     gr.HTML("""
@@ -432,7 +432,7 @@ with gr.Blocks(title="🎯 PixelHunt", css=CUSTOM_CSS) as demo:
             padding: 32px 24px 24px 24px;
             text-align: center;
         ">
-    
+
             <!-- الشعار -->
             <div style="font-size:1.6em; font-weight:900; letter-spacing:3px; color:#e94560; margin-bottom:4px;">
                 🎯 PIXELHUNT
@@ -440,10 +440,10 @@ with gr.Blocks(title="🎯 PixelHunt", css=CUSTOM_CSS) as demo:
             <div style="color:#64ffda; font-size:0.85em; margin-bottom:24px; letter-spacing:1px;">
                 Object Detection Pipeline · خط أنابيب كشف الأجسام
             </div>
-    
+
             <!-- الأدوات المستخدمة -->
             <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap; margin-bottom:24px;">
-    
+
                 <a href="https://github.com/ultralytics/ultralytics" target="_blank" style="
                     text-decoration:none;
                     background:#1e293b;
@@ -455,7 +455,7 @@ with gr.Blocks(title="🎯 PixelHunt", css=CUSTOM_CSS) as demo:
                     font-weight:600;
                     transition:all 0.2s;
                 ">⚡ YOLOv11</a>
-    
+
                 <a href="https://opencv.org" target="_blank" style="
                     text-decoration:none;
                     background:#1e293b;
@@ -466,7 +466,7 @@ with gr.Blocks(title="🎯 PixelHunt", css=CUSTOM_CSS) as demo:
                     font-size:0.82em;
                     font-weight:600;
                 ">👁️ OpenCV</a>
-    
+
                 <a href="https://www.gradio.app" target="_blank" style="
                     text-decoration:none;
                     background:#1e293b;
@@ -477,7 +477,7 @@ with gr.Blocks(title="🎯 PixelHunt", css=CUSTOM_CSS) as demo:
                     font-size:0.82em;
                     font-weight:600;
                 ">🎨 Gradio</a>
-    
+
                 <a href="https://pandas.pydata.org" target="_blank" style="
                     text-decoration:none;
                     background:#1e293b;
@@ -488,7 +488,7 @@ with gr.Blocks(title="🎯 PixelHunt", css=CUSTOM_CSS) as demo:
                     font-size:0.82em;
                     font-weight:600;
                 ">🐼 Pandas</a>
-    
+
                 <a href="https://www.python.org" target="_blank" style="
                     text-decoration:none;
                     background:#1e293b;
@@ -499,15 +499,15 @@ with gr.Blocks(title="🎯 PixelHunt", css=CUSTOM_CSS) as demo:
                     font-size:0.82em;
                     font-weight:600;
                 ">🐍 Python 3.10+</a>
-    
+
             </div>
-    
+
             <!-- فاصل -->
             <div style="border-top:1px solid #1e3a5f; margin: 0 10% 20px 10%;"></div>
-    
+
             <!-- الروابط -->
             <div style="display:flex; justify-content:center; gap:24px; flex-wrap:wrap; margin-bottom:20px;">
-    
+
                 <a href="https://github.com/abutlb/PixelHunt" target="_blank" style="
                     text-decoration:none;
                     color:#a8b2d8;
@@ -530,19 +530,19 @@ with gr.Blocks(title="🎯 PixelHunt", css=CUSTOM_CSS) as demo:
                     </svg>
                     GitHub
                 </a>
-    
+
                 <a href="https://github.com/abutlb/PixelHunt/issues" target="_blank" style="
                     text-decoration:none; color:#a8b2d8; font-size:0.85em;
                     display:flex; align-items:center; gap:5px;
                 ">🐛 Report Issue / بلّغ عن مشكلة</a>
-    
+
                 <a href="https://github.com/abutlb/PixelHunt/blob/main/README.md" target="_blank" style="
                     text-decoration:none; color:#a8b2d8; font-size:0.85em;
                     display:flex; align-items:center; gap:5px;
                 ">📖 Docs / التوثيق</a>
-    
+
             </div>
-    
+
             <!-- Copyright -->
             <div style="color:#4a5568; font-size:0.78em; letter-spacing:0.5px;">
                 © 2026 PixelHunt &nbsp;·&nbsp; MIT License &nbsp;·&nbsp;
@@ -552,7 +552,7 @@ with gr.Blocks(title="🎯 PixelHunt", css=CUSTOM_CSS) as demo:
                     @abutlb
                 </a>
             </div>
-    
+
         </div>
         """)
 
@@ -561,5 +561,6 @@ with gr.Blocks(title="🎯 PixelHunt", css=CUSTOM_CSS) as demo:
 if __name__ == "__main__":
     demo.launch(
         theme=gr.themes.Soft(primary_hue="blue"),
-        share=True,
+        css=CUSTOM_CSS,
+        ssr_mode=False
     )

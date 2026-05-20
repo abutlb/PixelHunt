@@ -12,21 +12,6 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
-
-      - name: Prepend HF header to README
-        run: |
-          echo '---
-          title: PixelHunt
-          emoji: 🎯
-          colorFrom: red
-          colorTo: blue
-          sdk: gradio
-          sdk_version: "6.14.0"
-          python_version: "3.13"
-          app_file: app.py
-          pinned: false
-          ---
-          ' | cat - README.md > temp && mv temp README.md
           
       - name: Push to Hugging Face Space
         env:

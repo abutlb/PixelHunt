@@ -1,3 +1,17 @@
+---
+title: PixelHunt
+emoji: 🎯
+colorFrom: red
+colorTo: blue
+sdk: gradio
+sdk_version: "6.14.0"
+python_version: "3.13"
+app_file: app.py
+pinned: false
+license: mit
+short_description: Detect, annotate & filter objects in images using YOLOv11
+---
+
 # 🎯 PixelHunt — Image Object Detection Pipeline
 
 <div align="center">
